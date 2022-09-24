@@ -1,21 +1,118 @@
-from typing import Any, Dict
-
-import atexit
 import os
+import atexit
 import tempfile
+import multiprocessing as mp
+
+from typing import Any, Dict, Optional
+from pydantic import BaseSettings, Field
+from language_tool_python.logs import logger
 
 ALLOWED_CONFIG_KEYS = { 
-    'maxTextLength', 'maxTextHardLength', 'secretTokenKey', 'maxCheckTimeMillis', 'maxErrorsPerWordRate',
-    'maxSpellingSuggestions', 'maxCheckThreads', 'cacheSize', 'cacheTTLSeconds', 'cacheSize', 'requestLimit',
-    'requestLimitInBytes', 'timeoutRequestLimit', 'requestLimitPeriodInSeconds', 'languageModel',
-    'word2vecModel', 'fasttextModel', 'fasttextBinary', 'maxWorkQueueSize', 'rulesFile', 'warmUp',
-    'blockedReferrers' 'premiumOnly', 'disabledRuleIds', 'pipelineCaching', 'maxPipelinePoolSize',
-    'pipelineCaching', 'pipelineExpireTimeInSeconds', 'pipelinePrewarming'
+    'maxTextLength', 
+    'maxTextHardLength', 
+    'secretTokenKey', 
+    'maxCheckTimeMillis', 
+    'maxErrorsPerWordRate',
+    'maxSpellingSuggestions', 
+    'maxCheckThreads', 
+    'cacheTTLSeconds', 
+    'cacheSize', 
+    'requestLimit',
+    'requestLimitInBytes', 
+    'timeoutRequestLimit', 
+    'requestLimitPeriodInSeconds', 
+    'languageModel',
+    'word2vecModel', 
+    'fasttextModel', 
+    'fasttextBinary', 
+    'maxWorkQueueSize', 
+    'rulesFile', 
+    'warmUp',
+    'blockedReferrers',
+    'premiumOnly', 
+    'disabledRuleIds', 
+    'pipelineCaching', 
+    'maxPipelinePoolSize',
+    'pipelineExpireTimeInSeconds', 
+    'pipelinePrewarming'
 }
+
+
+def to_camel_case(text: str):
+    """Convert a snake str to camel case."""
+    components = text.split("_")
+    # We capitalize the first letter of each component except the first one
+    # with the 'title' method and join them together.
+    return components[0] + "".join(x.title() for x in components[1:])
+
+def get_max_check_threads():
+    """Get the maximum number of threads to use for checking."""
+    return mp.cpu_count() * 4
+
+class ServerConfig(BaseSettings):
+
+    """LT Server Configurations."""
+    max_text_length: int = Field(0, alias='maxTextLength')
+    max_text_hard_length: int = Field(0, alias='maxTextHardLength')
+    secret_token_key: str = Field('', alias='secretTokenKey')
+    max_check_time_millis: int = Field(0, alias='maxCheckTimeMillis')
+    max_errors_per_word_rate: int = Field(0, alias='maxErrorsPerWordRate')
+    max_spelling_suggestions: int = Field(0, alias='maxSpellingSuggestions')
+    max_check_threads: int = Field(default_factory = get_max_check_threads, alias='maxCheckThreads')
+    cache_ttl_seconds: int = Field(300, alias='cacheTTLSeconds')
+    cache_size: int = Field(1000, alias='cacheSize')
+    request_limit: int = Field(100, alias='requestLimit')
+    request_limit_in_bytes: int = Field(1000000, alias='requestLimitInBytes')
+    timeout_request_limit: int = Field(100, alias='timeoutRequestLimit')
+    request_limit_period_in_seconds: int = Field(60, alias='requestLimitPeriodInSeconds')
+    language_model: str = Field('', alias='languageModel')
+    word2vec_model: str = Field('', alias='word2vecModel')
+    fasttext_model: str = Field('', alias='fasttextModel')
+    fasttext_binary: str = Field('', alias='fasttextBinary')
+    max_work_queue_size: int = Field(1000, alias='maxWorkQueueSize')
+    rules_file: str = Field('', alias='rulesFile')
+    warm_up: bool = Field(True, alias='warmUp')
+    blocked_referrers: str = Field('', alias='blockedReferrers')
+    premium_only: bool = Field(False, alias='premiumOnly')
+    disabled_rule_ids: str = Field('', alias='disabledRuleIds')
+    pipeline_caching: bool = Field(True, alias='pipelineCaching')
+    max_pipeline_pool_size: int = Field(100, alias='maxPipelinePoolSize')
+    pipeline_expire_time_in_seconds: int = Field(60, alias='pipelineExpireTimeInSeconds')
+    pipeline_prewarming: bool = Field(False, alias='pipelinePrewarming')
+
+    # Other Settings
+    public: bool = True
+    premium_always: bool = True
+
+    class Config:
+        env_prefix = 'LT_'
+        case_sensitive = False
+    
+    def to_config(self) -> Dict[str, Any]:
+        """Convert config to dict."""
+        config = self.dict(
+            by_alias = True,
+            exclude_none = True,
+            exclude = {'public', 'premium_always'},
+        )
+        config = {k: v for k,v in config.items() if v}
+        return config
+    
+    def get_server_options(self):
+        """Get server options."""
+        options = []
+        if self.public: options.append('--public')
+        if self.premium_always: options.append('--premium-always')
+        return options
+
+
+
+
 class LanguageToolConfig:
     config: Dict[str, Any]
     path: str
     def __init__(self, config: Dict[str, Any]):
+        logger.info(f'Creating config file with {config}')
         assert set(config.keys()) <= ALLOWED_CONFIG_KEYS, f"unexpected keys in config: {set(config.keys()) - ALLOWED_CONFIG_KEYS}"
         assert len(config), "config cannot be empty"
         self.config = config

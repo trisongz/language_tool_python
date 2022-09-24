@@ -80,15 +80,12 @@ class Match:
 
     def __str__(self):
         ruleId = self.ruleId
-        s = 'Offset {}, length {}, Rule ID: {}'.format(
-            self.offset, self.errorLength, ruleId)
+        s = f'Offset {self.offset}, length {self.errorLength}, Rule ID: {ruleId}'
         if self.message:
-            s += '\nMessage: {}'.format(self.message)
+            s += f'\nMessage: {self.message}'
         if self.replacements:
-            s += '\nSuggestion: {}'.format('; '.join(self.replacements))
-        s += '\n{}\n{}'.format(
-            self.context, ' ' * self.offsetInContext + '^' * self.errorLength
-        )
+            s += f"\nSuggestion: {'; '.join(self.replacements)}"
+        s += f"\n{self.context}\n{' ' * self.offsetInContext + '^' * self.errorLength}"
         return s
 
     @property
@@ -115,5 +112,4 @@ class Match:
 
     def __getattr__(self, name):
         if name not in get_match_ordered_dict():
-            raise AttributeError('{!r} object has no attribute {!r}'
-                                 .format(self.__class__.__name__, name))
+            raise AttributeError('{!r} object has no attribute {!r}'.format(self.__class__.__name__, name))

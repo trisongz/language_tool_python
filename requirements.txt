@@ -1,2 +1,7 @@
-requests
 tqdm
+# anyio
+# httpx
+loguru
+requests
+pydantic
+aiohttp

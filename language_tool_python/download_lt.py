@@ -1,34 +1,36 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Download latest LanguageTool distribution."""
-
-import glob
-import logging
 import os
 import re
-import requests
-import subprocess
 import sys
-import os
-import tempfile
+import glob
 import tqdm
+# import httpx
+# import logging
+import requests
 import zipfile 
+import tempfile
+import subprocess
 
-from distutils.spawn import find_executable
 from urllib.parse import urljoin
-from .utils import get_language_tool_download_path
+# from distutils.spawn import find_executable
+from language_tool_python.utils import get_language_tool_download_path
+from language_tool_python.which import get_java_path
+from language_tool_python.logs import logger
 
 # Create logger for this file.
-logging.basicConfig(format='%(message)s')
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# logging.basicConfig(format='%(message)s')
+# logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
 
 # Get download host from environment or default.
 BASE_URL = os.environ.get('LTP_DOWNLOAD_HOST', 'https://www.languagetool.org/download/')
+LATEST_VERSION = os.getenv('LTP_VERSION', '5.8') # Use Stable Version
+
 FILENAME = 'LanguageTool-{version}.zip'
 
-LATEST_VERSION = '5.7'
 
 JAVA_VERSION_REGEX = re.compile(
     r'^(?:java|openjdk) version "(?P<major1>\d+)(|\.(?P<major2>\d+)\.[^"]+)"',
@@ -57,26 +59,27 @@ def parse_java_version(version_text):
     (1, 8)
 
     """
-    match = re.search(JAVA_VERSION_REGEX, version_text) or re.search(JAVA_VERSION_REGEX_UPDATED, version_text) 
+    match = re.search(JAVA_VERSION_REGEX, version_text) or re.search(JAVA_VERSION_REGEX_UPDATED, version_text)
     if not match:
-        raise SystemExit(
-            'Could not parse Java version from """{}""".'.format(version_text))
+        raise SystemExit(f'Could not parse Java version from """{version_text}""".')
     major1 = int(match.group('major1'))
     major2 = int(match.group('major2')) if match.group('major2') else 0
     return (major1, major2)
 
 def confirm_java_compatibility():
     """ Confirms Java major version >= 8. """
-    java_path = find_executable('java')
+    java_path = get_java_path()
     if not java_path:
         # Just ignore this and assume an old version of Java. It might not be
         # found because of a PATHEXT-related issue
         # (https://bugs.python.org/issue2200).
         raise ModuleNotFoundError('No java install detected. Please install java to use language-tool-python.')
 
-    output = subprocess.check_output([java_path, '-version'],
-                                     stderr=subprocess.STDOUT,
-                                     universal_newlines=True)
+    output = subprocess.check_output(
+        [java_path, '-version'],
+        stderr = subprocess.STDOUT,
+        universal_newlines = True
+    )
 
     major_version, minor_version = parse_java_version(output)
     # Some installs of java show the version number like `14.0.1` and others show `1.14.0.1`
@@ -103,7 +106,7 @@ def http_get(url, out_file, proxies=None):
     content_length = req.headers.get('Content-Length')
     total = int(content_length) if content_length is not None else None
     if req.status_code == 403: # Not found on AWS
-        raise Exception('Could not find at URL {}.'.format(url))
+        raise Exception(f'Could not find at URL {url}.')
     progress = tqdm.tqdm(unit="B", unit_scale=True, total=total, desc=f'Downloading LanguageTool {LATEST_VERSION}')
     for chunk in req.iter_content(chunk_size=1024):
         if chunk: # filter out keep-alive new chunks
@@ -113,7 +116,7 @@ def http_get(url, out_file, proxies=None):
 
 def unzip_file(temp_file, directory_to_extract_to):
     """ Unzips a .zip file to folder path. """
-    logger.info('Unzipping {} to {}.'.format(temp_file.name, directory_to_extract_to))
+    logger.info(f'Unzipping {temp_file.name} to {directory_to_extract_to}.')
     with zipfile.ZipFile(temp_file.name, 'r') as zip_ref:
         zip_ref.extractall(directory_to_extract_to)
 
@@ -124,13 +127,13 @@ def download_zip(url, directory):
     downloaded_file = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
     http_get(url, downloaded_file)
     # Close the file so we can extract it.
-    downloaded_file.close() 
+    downloaded_file.close()
     # Extract zip file to path.
     unzip_file(downloaded_file, directory)
     # Remove the temporary file.
     os.remove(downloaded_file.name)
     # Tell the user the download path.
-    logger.info('Downloaded {} to {}.'.format(url, directory))
+    logger.info(f'Downloaded {url} to {directory}.')
 
 def download_lt():
     download_folder = get_language_tool_download_path()
@@ -147,10 +150,10 @@ def download_lt():
     language_tool_download_url = urljoin(BASE_URL, filename)
     dirname = os.path.splitext(filename)[0]
     extract_path = os.path.join(download_folder, dirname)
-
     if extract_path in old_path_list:
         return
-
+    
+    logger.info(f'Extract Path: {extract_path}')
     download_zip(language_tool_download_url, download_folder)
 
 if __name__ == '__main__':

@@ -1,18 +1,20 @@
-from typing import List, Tuple
-
-import http.client
-import glob
-import locale
 import os
 import re
-import subprocess
 import sys
+import glob
+import httpx
+import locale
+import subprocess
+import http.client
 import urllib.parse
 import urllib.request
 
-from .config_file import LanguageToolConfig
-from .match import Match
-from .which import which
+from typing import List, Tuple, Union, Optional
+
+from language_tool_python.config_file import LanguageToolConfig
+from language_tool_python.match import Match
+from language_tool_python.which import which, get_java_path
+from language_tool_python.logs import logger
 
 JAR_NAMES = [
     'languagetool-server.jar',
@@ -45,11 +47,11 @@ class PathError(LanguageToolError):
 def parse_url(url_str):
     """ Parses a URL string, and adds 'http' if necessary. """
     if 'http' not in url_str:
-        url_str = 'http://' + url_str   
+        url_str = f'http://{url_str}'   
 
     return urllib.parse.urlparse(url_str).geturl()
 
-def correct(text: str, matches: [Match]) -> str:
+def correct(text: str, matches: List[Match]) -> str:
     """Automatically apply suggestions to the text."""
     ltext = list(text)
     matches = [match for match in matches if match.replacements]
@@ -87,27 +89,38 @@ def get_language_tool_directory():
     ]
 
     if not len(language_tool_path_list):
-        raise FileNotFoundError('LanguageTool not found in {}.'.format(download_folder))
+        raise FileNotFoundError(f'LanguageTool not found in {download_folder}.')
 
     return max(language_tool_path_list)
 
 
-def get_server_cmd(port: int=None, config: LanguageToolConfig=None) -> List[str]:
+def get_server_cmd(
+    port: int = None, 
+    config: LanguageToolConfig = None,
+    java_options: Optional[List[str]] = None,
+    options: Optional[List[str]] = None,
+) -> Union[List[str], str]:
     java_path, jar_path = get_jar_info()
-    cmd = [java_path, '-cp', jar_path,
-            'org.languagetool.server.HTTPServer']
-
-    if port is not None:
-        cmd +=  ['-p', str(port)]
-    
-    if config is not None:
-        cmd += ['--config', config.path]
-
+    cmd = [
+        java_path
+    ]
+    if java_options:
+        logger.info(f'Adding Java options: {java_options}')
+        cmd.extend(java_options)
+    cmd.extend(
+        ['-cp', jar_path, 'org.languagetool.server.HTTPServer']
+    )
+    if port is not None: cmd += ['-p', str(port)]
+    if config is not None: cmd += ['--config', config.path]
+    if options is not None: 
+        logger.info(f'Adding options: {options}')
+        cmd += options
     return cmd
 
 
 def get_jar_info() -> Tuple[str, str]:
-    java_path = which('java')
+    java_path = get_java_path()
+    # which('java')
     if not java_path:
         raise JavaError("can't find Java")
     dir_name = get_language_tool_directory()

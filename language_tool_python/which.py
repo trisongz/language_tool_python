@@ -4,7 +4,7 @@
 
 import os
 import sys
-
+from distutils.spawn import find_executable
 
 __all__ = ['which']
 
@@ -63,6 +63,33 @@ else:
 
     get_path_list = _get_path_list
 
+## v2
+def get_java_path():
+    java_paths = os.getenv('JAVA_HOME')
+    if java_paths:
+        if not java_paths.endswith('bin'): java_paths = os.path.join(java_paths, 'bin')
+        java_paths += f'{os.pathsep + os.getenv("PATH")}'
+    return find_executable('java', path = java_paths)
+
+def get_variable_separator():
+    """
+    Returns the environment variable separator for the current platform.
+    :return: Environment variable separator
+    """
+    return ';' if sys.platform.startswith('win') else ':'
+
+def get_binary_path(executable: str):
+    """
+    Searches for a binary named `executable` in the current PATH. If an executable is found, its absolute path is returned
+    else None.
+    :param executable: Name of the binary
+    :return: Absolute path or None
+    """
+    if 'PATH' not in os.environ: return None
+    for directory in os.environ['PATH'].split(get_variable_separator()):
+        binary = os.path.abspath(os.path.join(directory, executable))
+        if os.path.isfile(binary) and os.access(binary, os.X_OK): return binary
+    return None
 
 def main():
     for arg in sys.argv[1:]:
