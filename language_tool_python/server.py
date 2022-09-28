@@ -1,7 +1,7 @@
 import os
 import re
 import json
-# import httpx
+import httpx
 import atexit
 import socket
 import asyncio
@@ -355,15 +355,26 @@ class AsyncLanguageTool(LanguageTool):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._loop = asyncio.get_event_loop()
-        self._session = aiohttp.ClientSession(loop=self._loop)
+        self._session = httpx.AsyncClient()
+        #self._loop = asyncio.get_event_loop()
+        #self._session = aiohttp.ClientSession(loop=self._loop)
+    
+    async def __aexit__(
+        self, exc_type, exc_val, exc_tb
+    ) -> None:
+        if self._session:
+            await self._session.aclose()
+            self._session = None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._session.close()
+        #if self._session:
+        #    self._session.close()
+        #    # self._session.close()
+        # self._session.close()
         self.close()
 
     def __del__(self):
-        self._session.close()
+        # self._session.close()
         self.close()
     
     async def correct(self, text: str) -> str:

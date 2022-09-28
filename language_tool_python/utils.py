@@ -2,7 +2,7 @@ import os
 import re
 import sys
 import glob
-import httpx
+#import httpx
 import locale
 import subprocess
 import http.client
