@@ -356,6 +356,7 @@ class AsyncLanguageTool(LanguageTool):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._session = httpx.AsyncClient()
+        
         #self._loop = asyncio.get_event_loop()
         #self._session = aiohttp.ClientSession(loop=self._loop)
     
@@ -393,16 +394,17 @@ class AsyncLanguageTool(LanguageTool):
             logger.info(f'_query_server url: {url} | params: {params}')
         for n in range(num_tries):
             try:
-                async with self._session.get(url, params=params, timeout=self._TIMEOUT) as response:
-                    try:
-                        return await response.json()
-                    except json.decoder.JSONDecodeError as e:
-                        if DEBUG_MODE:
-                            logger.info(f'URL {url} and params {params} returned invalid JSON response:')
-                            logger.info(f'{response}')
-                            logger.info(response.content)
-                        raise LanguageToolError(response.content.decode()) from e
-            except (IOError, http.client.HTTPException) as e:
+                # async with self._session.get(url, params=params, timeout=self._TIMEOUT) as response:
+                response = await self._session.get(url, params=params, timeout=self._TIMEOUT)
+                try:
+                    return await response.json()
+                except json.decoder.JSONDecodeError as e:
+                    if DEBUG_MODE:
+                        logger.info(f'URL {url} and params {params} returned invalid JSON response:')
+                        logger.info(f'{response}')
+                        logger.info(response.content)
+                    raise LanguageToolError(response.content.decode()) from e
+            except (IOError, http.client.HTTPException, httpx.HTTPError) as e:
                 if self._remote is False:
                     self._terminate_server()
                     self._start_local_server()
