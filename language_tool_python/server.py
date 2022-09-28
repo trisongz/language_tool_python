@@ -397,7 +397,7 @@ class AsyncLanguageTool(LanguageTool):
                 # async with self._session.get(url, params=params, timeout=self._TIMEOUT) as response:
                 response = await self._session.get(url, params=params, timeout=self._TIMEOUT)
                 try:
-                    return await response.json()
+                    return response.json()
                 except json.decoder.JSONDecodeError as e:
                     if DEBUG_MODE:
                         logger.info(f'URL {url} and params {params} returned invalid JSON response:')
